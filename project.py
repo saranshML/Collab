@@ -424,15 +424,3 @@ plt.xlabel('Sample Index')
 plt.ylabel('QoS Metric Value')
 plt.legend()
 plt.show()
-
-#%%
-import os
-
-# Get the current file path
-file_path = os.path.abspath(__file__)
-
-# Convert the path to the WSL equivalent
-wsl_path = file_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
-
-print(f"WSL Address: {wsl_path}")
-# %%
