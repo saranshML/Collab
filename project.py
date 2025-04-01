@@ -347,80 +347,180 @@ print(f" - Mean Squared Error (MSE): {best_model_metrics['MSE']:.2f}")
 print(f" - Mean Absolute Error (MAE): {best_model_metrics['MAE']:.2f}")
 print(f" - R² Score: {best_model_metrics['R2']:.2f}")
 
-# %%
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.metrics import mean_squared_error
-
-# Train the model for latency prediction
-latency_model = GradientBoostingRegressor(n_estimators=200, max_depth=5, learning_rate=0.1, random_state=42)
-latency_model.fit(X_train_latency, y_train_latency)
-
-# Predict latency on test data
-latency_predictions = latency_model.predict(X_test_latency)
-
-# Evaluate model performance
-latency_mse = mean_squared_error(y_test_latency, latency_predictions)
-print(f"Latency Prediction MSE: {latency_mse:.2f}")
-
-# Plot actual vs predicted latency
-import matplotlib.pyplot as plt
-plt.figure(figsize=(8, 6))
-plt.scatter(range(len(y_test_latency)), y_test_latency, color='blue', label='Actual Latency')
-plt.scatter(range(len(latency_predictions)), latency_predictions, color='red', label='Predicted Latency', alpha=0.6)
-plt.title('Latency Prediction: Actual vs Predicted')
-plt.xlabel('Sample Index')
-plt.ylabel('Latency (ms)')
-plt.legend()
-plt.show()
-
-# %%
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report
-
-# Train the model for failure risk classification
-failure_risk_model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
-failure_risk_model.fit(X_train_failure, y_train_failure)
-
-# Predict failure risk on test data
-failure_risk_predictions = failure_risk_model.predict(X_test_failure)
-
-# Evaluate model performance
-print("Classification Report:")
-print(classification_report(y_test_failure, failure_risk_predictions))
-
-# Visualize the failure risk distribution
-risk_classes = ['Low Risk', 'Medium Risk', 'High Risk']
-actual_counts = [sum(y_test_failure == cls) for cls in risk_classes]
-predicted_counts = [sum(failure_risk_predictions == cls) for cls in risk_classes]
-
-plt.bar(risk_classes, actual_counts, alpha=0.6, label='Actual')
-plt.bar(risk_classes, predicted_counts, alpha=0.6, label='Predicted')
-plt.title('Network Failure Risk Prediction: Actual vs Predicted')
-plt.ylabel('Count')
-plt.legend()
-plt.show()
-
 #%%
-from sklearn.svm import SVR
-from sklearn.metrics import mean_absolute_error
+# Import required libraries
+import customtkinter as ctk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-# Train the model for QoS prediction
-qos_model = SVR(kernel='rbf', C=100, gamma=0.1)
-qos_model.fit(X_train_qos, y_train_qos)
+# Import individual models and test datasets from project.py
+from project import knn_model, rf_model, gbt_model, svm_model, X_test, y_test
 
-# Predict QoS metrics on test data
-qos_predictions = qos_model.predict(X_test_qos)
+# Initialize the CustomTkinter window
+ctk.set_appearance_mode("System")  # Light, Dark, or System theme
+ctk.set_default_color_theme("blue")  # Default blue theme
+root = ctk.CTk()
+root.title("Model Performance Dashboard")
+root.geometry("1000x700")
 
-# Evaluate model performance
-qos_mae = mean_absolute_error(y_test_qos, qos_predictions)
-print(f"QoS Prediction MAE: {qos_mae:.2f}")
+# Prepare models and their names
+models = {
+    "KNN Model": knn_model,
+    "Random Forest Model": rf_model,
+    "Gradient Boosting Model": gbt_model,
+    "SVM Model": svm_model
+}
 
-# Visualize QoS metrics predictions
-plt.figure(figsize=(8, 6))
-plt.plot(range(len(y_test_qos)), y_test_qos, label='Actual QoS Metrics', color='blue')
-plt.plot(range(len(qos_predictions)), qos_predictions, label='Predicted QoS Metrics', color='green')
-plt.title('QoS Metrics Prediction: Actual vs Predicted')
-plt.xlabel('Sample Index')
-plt.ylabel('QoS Metric Value')
-plt.legend()
+# Function to calculate model performance metrics
+def calculate_metrics():
+    metrics = {}
+    for model_name, model in models.items():
+        predictions = model.predict(X_test)
+        mse = mean_squared_error(y_test, predictions)
+        mae = mean_absolute_error(y_test, predictions)
+        metrics[model_name] = {"MSE": mse, "MAE": mae}
+    return metrics
+
+# Pre-calculate metrics for all models
+results = calculate_metrics()
+
+# Function to display performance metrics and plot the selected model's data
+def show_metrics():
+    selected_model = model_choice.get()
+    metrics_label.configure(
+        text=f"Model: {selected_model}\n"
+             f"Mean Squared Error (MSE): {results[selected_model]['MSE']:.2f}\n"
+             f"Mean Absolute Error (MAE): {results[selected_model]['MAE']:.2f}"
+    )
+    plot_chart(selected_model)
+
+# Function to generate a bar chart for the selected model
+def plot_chart(model_name):
+    mse = results[model_name]["MSE"]
+    mae = results[model_name]["MAE"]
+
+    # Generate bar chart
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.bar(["MSE", "MAE"], [mse, mae], color=["#1f77b4", "#ff7f0e"])
+    ax.set_title(f"{model_name} Metrics")
+    ax.set_ylabel("Error")
+    ax.set_xlabel("Metrics")
+
+    # Clear previous chart and display the updated one
+    for widget in chart_frame.winfo_children():
+        widget.destroy()
+    canvas = FigureCanvasTkAgg(fig, master=chart_frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill="both", expand=True)
+
+# Dropdown menu for selecting a model
+model_label = ctk.CTkLabel(root, text="Select a Model:", font=("Helvetica", 16))
+model_label.pack(pady=10)
+model_choice = ctk.CTkComboBox(root, values=list(models.keys()), font=("Helvetica", 14))
+model_choice.pack(pady=5)
+model_choice.set(list(models.keys())[0])  # Set default selection
+
+# Button to show metrics and chart for the selected model
+show_button = ctk.CTkButton(root, text="Show Metrics", command=show_metrics, font=("Helvetica", 14))
+show_button.pack(pady=10)
+
+# Label to display model metrics
+metrics_label = ctk.CTkLabel(root, text="", font=("Helvetica", 14))
+metrics_label.pack(pady=10)
+
+# Frame for displaying charts
+chart_frame = ctk.CTkFrame(root, width=800, height=500)
+chart_frame.pack(pady=20)
+
+# Run the GUI application
+root.mainloop()
+# %%
+import pandas as pd
+import matplotlib.pyplot as plt
+
+data = pd.read_csv(r"/mnt/c/Users/saran/Desktop/movies/dataset.csv")
+
+# Ensure 'Timestamp' column is in datetime format
+data['Timestamp'] = pd.to_datetime(data['Timestamp'], format='%H:%M:%S')
+
+# Convert the 'Timestamp' column to string format (HH:MM:SS)
+data['Timestamp'] = data['Timestamp'].dt.strftime('%H:%M:%S')
+
+# Generate predicted values using the models
+# Assuming `rf_predictions`, `svm_predictions`, `knn_predictions`, and `gbt_predictions` are already computed
+rf_predictions = rf_model.predict(X_test)
+svm_predictions = svm_model.predict(X_test)
+knn_predictions = knn_model.predict(X_test)
+gbt_predictions = gbt_model.predict(X_test)
+
+# Plot the actual Required_Bandwidth values
+plt.figure(figsize=(12, 6))
+plt.scatter(data['Timestamp'], data['Required_Bandwidth'], color='blue', marker='o', label="Actual Required Bandwidth")
+
+# Overlay predicted values for each model
+plt.scatter(data['Timestamp'][:len(rf_predictions)], rf_predictions, color='red', marker='x', label="RF Predicted Bandwidth")
+plt.scatter(data['Timestamp'][:len(svm_predictions)], svm_predictions, color='green', marker='v', label="SVM Predicted Bandwidth")
+plt.scatter(data['Timestamp'][:len(knn_predictions)], knn_predictions, color='orange', marker='s', label="KNN Predicted Bandwidth")
+plt.scatter(data['Timestamp'][:len(gbt_predictions)], gbt_predictions, color='purple', marker='d', label="GBT Predicted Bandwidth")
+
+# Customize the plot
+plt.title("Actual vs Predicted Bandwidth Over Time", fontsize=16)
+plt.xlabel("Time (HH:MM:SS)", fontsize=14)
+plt.ylabel("Required Bandwidth (units)", fontsize=14)
+plt.grid(True)
+plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
+plt.legend(loc="upper left")
+
+# Show the plot
+plt.tight_layout()  # Adjust layout to avoid clipping labels
 plt.show()
+
+# %%
+import pandas as pd
+import matplotlib.pyplot as plt
+data = pd.read_csv(r"/mnt/c/Users/saran/Desktop/movies/dataset.csv")
+
+# Ensure 'Timestamp' column is in datetime format
+data['Timestamp'] = pd.to_datetime(data['Timestamp'], format='%H:%M:%S')
+
+# Convert the 'Timestamp' column to string format (HH:MM:SS)
+data['Timestamp'] = data['Timestamp'].dt.strftime('%H:%M:%S')
+
+# Generate predicted values using the models
+rf_predictions = rf_model.predict(X_test)
+svm_predictions = svm_model.predict(X_test)
+knn_predictions = knn_model.predict(X_test)
+gbt_predictions = gbt_model.predict(X_test)
+
+# Define a function to create separate plots
+def plot_actual_vs_predicted(timestamp, actual, predicted, model_name):
+    plt.figure(figsize=(12, 6))
+    # Plot actual bandwidth
+    plt.scatter(timestamp[:len(actual)], actual[:len(timestamp)], color='blue', marker='o', label="Actual Required Bandwidth")
+    # Plot predicted bandwidth for the model
+    plt.scatter(timestamp[:len(predicted)], predicted[:len(timestamp)], color='red', marker='x', label=f"Predicted Bandwidth ({model_name})")
+
+    # Customize the plot
+    plt.title(f"Actual vs Predicted Bandwidth ({model_name})", fontsize=16)
+    plt.xlabel("Time (HH:MM:SS)", fontsize=14)
+    plt.ylabel("Required Bandwidth (units)", fontsize=14)
+    plt.grid(True)
+    plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
+    plt.legend(loc="upper left")
+    plt.tight_layout()  # Adjust layout to avoid clipping labels
+    plt.show()
+
+# Plot for Random Forest Model
+plot_actual_vs_predicted(data['Timestamp'], data['Required_Bandwidth'], rf_predictions, "Random Forest Model")
+
+# Plot for SVM Model
+plot_actual_vs_predicted(data['Timestamp'], data['Required_Bandwidth'], svm_predictions, "SVM Model")
+
+# Plot for KNN Model
+plot_actual_vs_predicted(data['Timestamp'], data['Required_Bandwidth'], knn_predictions, "KNN Model")
+
+# Plot for Gradient Boosting Model
+plot_actual_vs_predicted(data['Timestamp'], data['Required_Bandwidth'], gbt_predictions, "Gradient Boosting Model")
+
+# %%
